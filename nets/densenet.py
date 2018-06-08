@@ -60,22 +60,105 @@ def densenet(images, num_classes=1001, is_training=False,
     with tf.variable_scope(scope, 'DenseNet', [images, num_classes]):
         with slim.arg_scope(bn_drp_scope(is_training=is_training,
                                          keep_prob=dropout_keep_prob)) as ssc:
-            pass
             ##########################
             # Put your code here.
+            
+            "Initial_convolution"
+            end_point = 'Initial_convolution'
+            with tf.variable_scope(end_point):
+		            x = slim.conv2d(images, growth, [7,7], stride=2, padding='same', scope='conv7x7')
+		            x = slim.batch_norm(x, scope='bn')
+								x = tf.nn.relu(x)	
+								x = slim.max_pool2d(x, [3, 3], stride=2,  padding='same', scope='MaxPool3x3')
+								net = slim.dropout(x, scope='dropout')
+            end_points[end_point]= net
+            
+           "dense_block1"
+            end_point = 'dense_block1'
+            with tf.variable_scope(end_point):
+		            net=block(net, 6, growth, scope=end_point)    
+            end_points[end_point]= net            
+            
+            "transition_lay1"
+            end_point = 'transition_lay1'
+            with tf.variable_scope(end_point):
+		            x=bn_act_conv_drp(net, reduce_dim(net), [1,1], scope='conv1x1')
+								net = slim.avg_pool2d(x, [2,2] stride=2,  scope='avgPool2x2')
+            end_points[end_point]= net            
+            
+            
+           "dense_block2"
+            end_point = 'dense_block2'
+            with tf.variable_scope(end_point):
+		            net=block(net, 12, growth, scope=end_point)    
+            end_points[end_point]= net            
+            
+            "transition_lay2"
+            end_point = 'transition_lay2'
+            with tf.variable_scope(end_point):
+		            x=bn_act_conv_drp(net, reduce_dim(net), [1,1], scope='conv1x1')
+								net = slim.avg_pool2d(x, [2,2] stride=2,  scope='avgPool2x2')
+            end_points[end_point]= net                
+            
+           "dense_block3"
+            end_point = 'dense_block3'
+            with tf.variable_scope(end_point):
+		            net=block(net, 24, growth, scope=end_point)    
+            end_points[end_point]= net            
+            
+            "transition_lay3"
+            end_point = 'transition_lay3'
+            with tf.variable_scope(end_point):
+		            x = bn_act_conv_drp(net, reduce_dim(net), [1,1], scope='conv1x1')
+								net = slim.avg_pool2d(x, [2,2] stride=2,  scope='avgPool2x2')
+            end_points[end_point]= net              
+            
+           "dense_block4"
+            end_point = 'dense_block4'
+            with tf.variable_scope(end_point):
+		            net = block(net, 16, growth, scope=end_point)    
+            end_points[end_point]= net              
+            
+           "global_pool"
+            end_point = 'global_pool'  
+            with tf.variable_scope(end_point): 
+            	net = slim.batch_norm(net,scope='bn')
+            	net = tf.nn.relu(net)        
+            	net = tf.reduce_mean(net, [1, 2], keep_dims=True, name='global_pool')
+            	net = slim.dropout(net, scope='Dropout')
+        		end_points[end_point] = net
+            
+           "Logits"
+            end_point = 'Logits'  
+            with tf.variable_scope(end_point):            
+            		logits = slim.conv2d(net, num_classes, [1, 1], activation_fn=None, normalizer_fn=None, scope='logits')   
+            		logits = tf.squeeze(logits, [1, 2], name='SpatialSqueeze')    
+                end_points['predictions'] = slim.softmax(logits, scope='predictions')
+          	end_points[end_point] = logits
+            
+            
             ##########################
 
     return logits, end_points
 
 
-def bn_drp_scope(is_training=True, keep_prob=0.8):
-    keep_prob = keep_prob if is_training else 1
-    with slim.arg_scope(
-        [slim.batch_norm],
-            scale=True, is_training=is_training, updates_collections=None):
-        with slim.arg_scope(
-            [slim.dropout],
-                is_training=is_training, keep_prob=keep_prob) as bsc:
+def bn_drp_scope(is_training=True, 
+								keep_prob=0.8,
+								batch_norm_decay=0.997,
+								batch_norm_epsilon=1e-5,
+								batch_norm_scale=True
+								):
+									
+    keep_prob = keep_prob if is_training else 1   
+		batch_norm_params = {
+				'decay': batch_norm_decay,
+				'epsilon': batch_norm_epsilon,
+				'scale': batch_norm_scale,
+				'updates_collections': tf.GraphKeys.UPDATE_OPS,
+				'fused': None,  # Use fused batch norm if possible.
+		}
+    with slim.arg_scope([slim.batch_norm], is_training=is_training, **batch_norm_params):
+        with slim.arg_scope([slim.dropout], is_training=is_training, keep_prob=keep_prob) as bsc:
             return bsc
 
 
@@ -88,13 +171,12 @@ def densenet_arg_scope(weight_decay=0.004):
     Returns:
       An `arg_scope` to use for the inception v3 model.
     """
-    with slim.arg_scope(
-        [slim.conv2d],
-        weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-            factor=2.0, mode='FAN_IN', uniform=False),
-        activation_fn=None, biases_initializer=None, padding='same',
-            stride=1) as sc:
-        return sc
+    with slim.arg_scope([slim.conv2d, slim.fully_connected],
+        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=2.0, mode='FAN_IN', uniform=False), 
+        biases_initializer=tf.zeros_initializer(), 
+        weights_regularizer=slim.l2_regularizer(weight_decay) ):
+        		with slim.arg_scope([slim.conv2d], activation_fn = None, normalizer_fn = None, padding='same',stride=1) as sc:
+  							return sc
 
 
 densenet.default_image_size = 224
