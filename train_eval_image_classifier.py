@@ -55,7 +55,7 @@ if __name__ == '__main__':
                                          'learning_rate': FLAGS.learning_rate, 'optimizer': FLAGS.optimizer,
                                          'batch_size': FLAGS.batch_size, 'max_number_of_steps': steps, 'clone_on_cpu': FLAGS.clone_on_cpu}) + ckpt)
         for l in p:
-            print(p.strip())
+            print(l.strip())
 
         # eval
         print('################    eval    ################')
@@ -64,4 +64,4 @@ if __name__ == '__main__':
                                         'checkpoint_path': FLAGS.train_dir, 'batch_size': FLAGS.batch_size,
                                         'eval_dir': FLAGS. eval_dir, 'max_num_batches': FLAGS. max_num_batches}))
         for l in p:
-            print(p.strip())
+            print(l.strip())
