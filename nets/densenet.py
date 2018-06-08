@@ -145,7 +145,6 @@ def bn_drp_scope(is_training=True,
                     batch_norm_epsilon=1e-5,
                     batch_norm_scale=True
                 ):
-
     keep_prob = keep_prob if is_training else 1   
     batch_norm_params = { 
         'decay': batch_norm_decay,
